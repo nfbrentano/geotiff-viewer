@@ -5,9 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pix Force - Visualizador de Ortofotos</title>
     
-    <!-- SEO Meta Tags -->
+    <!-- SEO & Open Graph Meta Tags -->
     <meta name="description" content="Visualizador de Ortofotos de alta performance da Pix Force. Carregue arquivos locais ou links do Google Drive/Dropbox.">
+    <meta name="keywords" content="ortofoto, geotiff, tiff, viewer, visualizador, pix force, gis, mapas, satélite, drone">
     <meta name="author" content="Pix Force / Antigravity">
+    <meta property="og:title" content="Pix Force - Visualizador de Ortofotos">
+    <meta property="og:description" content="Visualizador de Ortofotos de alta performance da Pix Force.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://pixforce.com/wp-content/uploads/2023/05/Logotipo-PixForce-02-512x256px.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
     
     <!-- Google Fonts: Space Grotesk & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,8 +39,8 @@
             <div class="glow-bg"></div>
             
             <header class="main-header">
-                <img src="https://pixforce.com/wp-content/uploads/2023/05/Logotipo-PixForce-02-512x256px.png" alt="Pix Force Logo" class="brand-logo filter-white">
-                <span class="badge">Ortofoto Viewer v1.0</span>
+                <img src="https://pixforce.com/wp-content/uploads/2023/05/Logotipo-PixForce-02-512x256px.png" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'150\' height=\'48\'><text x=\'0\' y=\'32\' fill=\'white\' font-family=\'sans-serif\' font-weight=\'bold\' font-size=\'24\'>PIX FORCE</text></svg>';" alt="Pix Force Logo" class="brand-logo filter-white">
+                <span class="badge">Ortofoto Viewer v1.1</span>
             </header>
             
             <section class="upload-container">
@@ -101,7 +109,7 @@
             <!-- Painel Superior (Branding e Ações Rápidas) -->
             <header class="viewer-header glass-panel">
                 <div class="viewer-branding">
-                    <img src="https://pixforce.com/wp-content/uploads/2023/05/Logotipo-PixForce-02-512x256px.png" alt="Pix Force Logo" class="viewer-logo filter-white">
+                    <img src="https://pixforce.com/wp-content/uploads/2023/05/Logotipo-PixForce-02-512x256px.png" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'120\' height=\'36\'><text x=\'0\' y=\'26\' fill=\'white\' font-family=\'sans-serif\' font-weight=\'bold\' font-size=\'20\'>PIX FORCE</text></svg>';" alt="Pix Force Logo" class="viewer-logo filter-white">
                     <div class="divider-vertical"></div>
                     <div class="image-title-wrapper">
                         <h2 id="loaded-file-name">ortofoto_inspecao.tif</h2>
@@ -109,9 +117,13 @@
                     </div>
                 </div>
                 <div class="viewer-actions">
+                    <button id="btn-fullscreen" class="btn btn-outline-light btn-sm" title="Tela Cheia">
+                        <i data-lucide="maximize"></i>
+                        <span class="desktop-only">Tela Cheia</span>
+                    </button>
                     <button id="btn-back" class="btn btn-outline-light btn-sm">
                         <i data-lucide="chevron-left"></i>
-                        <span>Carregar Outra</span>
+                        <span class="desktop-only">Carregar Outra</span>
                     </button>
                 </div>
             </header>

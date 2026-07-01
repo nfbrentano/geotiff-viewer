@@ -87,10 +87,8 @@ function setupEventListeners() {
         }
     });
     
-    // Click on dropzone triggers input
-    dropzone.addEventListener('click', () => {
-        fileInput.click();
-    });
+    // Listener click no dropzone removido para evitar duplo disparo do input file.
+    // O input já ocupa a área inteira com CSS, então ele captura o clique nativamente.
     
     // URL Form Submission
     urlForm.addEventListener('submit', (e) => {
@@ -108,6 +106,15 @@ function setupEventListeners() {
     // 2. Viewer Page Elements
     // Back button
     document.getElementById("btn-back").addEventListener('click', exitViewer);
+    
+    // Fullscreen button
+    document.getElementById("btn-fullscreen").addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => console.error("Erro fullscreen:", err));
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    });
     
     // Opacity Slider
     const opacitySlider = document.getElementById("opacity-slider");
@@ -365,7 +372,7 @@ async function loadDemoGeoTIFF() {
     } catch (err) {
         console.error(err);
         hideLoading();
-        showToast("Erro CORS ou de rede. Carregando demo local simulada.");
+        showToast("Simulação ativada: O servidor bloqueou o acesso ao arquivo (CORS).", "warning");
         // Fallback to simulating a GeoTIFF using an image but with georeferenced attributes!
         simulateGeoreferencedDemo();
     }
@@ -466,8 +473,8 @@ async function parseGeoTIFFBlob(blob) {
         data[j+1] = g;
         data[j+2] = b;
         
-        // Hide absolute black nodata pixels (very common in drone orthophotos)
-        if (r === 0 && g === 0 && b === 0) {
+        // Hide near-black nodata pixels (very common in drone orthophotos)
+        if (r < 5 && g < 5 && b < 5) {
             data[j+3] = 0; // completely transparent alpha
         } else {
             data[j+3] = 255; // opaque
@@ -478,7 +485,7 @@ async function parseGeoTIFFBlob(blob) {
     updateLoadingProgress(90);
     document.getElementById("loader-subtitle").textContent = "Construindo mapa espacial...";
     
-    const dataUrl = canvas.toDataURL("image/png");
+    const dataUrl = canvas.toDataURL("image/webp", 0.92);
     
     // Georeferencing analysis
     if (bbox && bbox.length === 4) {
