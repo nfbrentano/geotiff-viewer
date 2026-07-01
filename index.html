@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pix Force - Visualizador de Ortofotos</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Visualizador de Ortofotos de alta performance da Pix Force. Carregue arquivos locais ou links do Google Drive/Dropbox.">
+    <meta name="author" content="Pix Force / Antigravity">
+    
+    <!-- Google Fonts: Space Grotesk & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div id="app-container">
+        
+        <!-- ==================== TELA DE ENTRADA (UPLOAD/LINK) ==================== -->
+        <main id="upload-screen" class="screen active">
+            <div class="glow-bg"></div>
+            
+            <header class="main-header">
+                <img src="https://pixforce.com/wp-content/uploads/2023/05/Logotipo-PixForce-02-512x256px.png" alt="Pix Force Logo" class="brand-logo filter-white">
+                <span class="badge">Ortofoto Viewer v1.0</span>
+            </header>
+            
+            <section class="upload-container">
+                <div class="welcome-text">
+                    <h1>Visualizador de Ortofotos</h1>
+                    <p>Carregue suas ortofotos (TIFF, GeoTIFF, PNG ou JPG) locais ou informe links compartilhados do Google Drive e Dropbox para iniciar a análise espacial.</p>
+                </div>
+                
+                <div class="glass-card upload-card">
+                    <!-- Dropzone -->
+                    <div id="dropzone" class="dropzone">
+                        <input type="file" id="file-input" accept=".tif,.tiff,.png,.jpg,.jpeg" class="file-hidden">
+                        <div class="dropzone-content">
+                            <div class="icon-wrapper pulse">
+                                <i data-lucide="upload-cloud"></i>
+                            </div>
+                            <h3>Arraste e solte o arquivo aqui</h3>
+                            <p>Suporta TIFF, GeoTIFF, PNG ou JPG (máx 500MB no navegador)</p>
+                            <span class="btn btn-primary">Selecionar Arquivo</span>
+                        </div>
+                    </div>
+                    
+                    <div class="divider">
+                        <span>ou insira um link externo</span>
+                    </div>
+                    
+                    <!-- URL Input Form -->
+                    <form id="url-form" class="url-input-group">
+                        <div class="input-wrapper">
+                            <i data-lucide="link"></i>
+                            <input type="url" id="url-input" placeholder="Cole o link do Google Drive, Dropbox ou URL direto da imagem..." required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary">
+                            <span>Carregar URL</span>
+                            <i data-lucide="arrow-right"></i>
+                        </button>
+                    </form>
+                    
+                    <!-- Quick Testing Section -->
+                    <div class="demo-section">
+                        <p>Deseja apenas testar?</p>
+                        <div class="demo-buttons">
+                            <button id="btn-demo-ortho" class="btn btn-outline" type="button">
+                                <i data-lucide="map"></i>
+                                <span>Ortofoto Demo (PNG)</span>
+                            </button>
+                            <button id="btn-demo-geotiff" class="btn btn-outline" type="button">
+                                <i data-lucide="globe"></i>
+                                <span>GeoTIFF Demo (Pequeno)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <footer class="upload-footer">
+                <p>&copy; 2026 Pix Force. Desenvolvido com foco em inteligência artificial e visão computacional aplicadas à engenharia e indústria.</p>
+            </footer>
+        </main>
+        
+        <!-- ==================== TELA DO VISUALIZADOR (MAPA) ==================== -->
+        <div id="viewer-screen" class="screen">
+            <!-- Container do Mapa Leaflet -->
+            <div id="map"></div>
+            
+            <!-- Painel Superior (Branding e Ações Rápidas) -->
+            <header class="viewer-header glass-panel">
+                <div class="viewer-branding">
+                    <img src="https://pixforce.com/wp-content/uploads/2023/05/Logotipo-PixForce-02-512x256px.png" alt="Pix Force Logo" class="viewer-logo filter-white">
+                    <div class="divider-vertical"></div>
+                    <div class="image-title-wrapper">
+                        <h2 id="loaded-file-name">ortofoto_inspecao.tif</h2>
+                        <span id="file-size-badge" class="badge">124 MB</span>
+                    </div>
+                </div>
+                <div class="viewer-actions">
+                    <button id="btn-back" class="btn btn-outline-light btn-sm">
+                        <i data-lucide="chevron-left"></i>
+                        <span>Carregar Outra</span>
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Painel Lateral Esquerdo (Controles e Info) -->
+            <aside class="viewer-sidebar glass-panel scrollbar-styled">
+                
+                <!-- Sessão: Camadas e Modos -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        <i data-lucide="layers"></i>
+                        <h3>Camada de Ortofoto</h3>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="opacity-slider">Opacidade</label>
+                        <div class="slider-wrapper">
+                            <input type="range" id="opacity-slider" min="0" max="100" value="100">
+                            <span id="opacity-value">100%</span>
+                        </div>
+                    </div>
+                    
+                    <div id="basemap-control" class="control-group">
+                        <label>Mapa de Fundo</label>
+                        <div class="basemap-grid">
+                            <button class="basemap-card active" data-basemap="satellite">
+                                <span class="basemap-icon satellite"></span>
+                                <span>Satélite</span>
+                            </button>
+                            <button class="basemap-card" data-basemap="osm">
+                                <span class="basemap-icon osm"></span>
+                                <span>Vetor (OSM)</span>
+                            </button>
+                            <button class="basemap-card" data-basemap="none">
+                                <span class="basemap-icon dark"></span>
+                                <span>Sem Fundo</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sessão: Ajustes de Imagem -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        <i data-lucide="sliders-horizontal"></i>
+                        <h3>Ajustes de Imagem</h3>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="brightness-slider">Brilho</label>
+                        <div class="slider-wrapper">
+                            <input type="range" id="brightness-slider" min="50" max="150" value="100">
+                            <span id="brightness-value">100%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="contrast-slider">Contraste</label>
+                        <div class="slider-wrapper">
+                            <input type="range" id="contrast-slider" min="50" max="200" value="100">
+                            <span id="contrast-value">100%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="saturation-slider">Saturação</label>
+                        <div class="slider-wrapper">
+                            <input type="range" id="saturation-slider" min="0" max="200" value="100">
+                            <span id="saturation-value">100%</span>
+                        </div>
+                    </div>
+                    
+                    <button id="btn-reset-filters" class="btn btn-sm btn-outline-light w-full">
+                        <i data-lucide="rotate-ccw"></i>
+                        <span>Resetar Ajustes</span>
+                    </button>
+                </div>
+                
+                <!-- Sessão: Ferramentas de Medição -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        <i data-lucide="ruler"></i>
+                        <h3>Ferramentas de Medição</h3>
+                    </div>
+                    
+                    <div class="tools-grid">
+                        <button id="tool-measure-dist" class="tool-btn">
+                            <i data-lucide="line-chart"></i>
+                            <span>Distância</span>
+                        </button>
+                        <button id="tool-measure-area" class="tool-btn">
+                            <i data-lucide="hexagon"></i>
+                            <span>Área</span>
+                        </button>
+                    </div>
+                    
+                    <div id="measurement-info" class="measurement-result-box hidden">
+                        <div class="result-header">
+                            <span class="result-label">Resultado da Medição</span>
+                            <button id="btn-clear-measurement" title="Limpar medição">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </div>
+                        <div class="result-values">
+                            <div class="result-row" id="result-distance-row">
+                                <span class="lbl">Comprimento:</span>
+                                <span class="val" id="result-distance">-</span>
+                            </div>
+                            <div class="result-row hidden" id="result-area-row">
+                                <span class="lbl">Área total:</span>
+                                <span class="val" id="result-area">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sessão: Informações Técnicas -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        <i data-lucide="info"></i>
+                        <h3>Especificações Técnicas</h3>
+                    </div>
+                    
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="label">Dimensões:</span>
+                            <span class="value" id="meta-resolution">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Tipo do Arquivo:</span>
+                            <span class="value" id="meta-type">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Georreferenciado:</span>
+                            <span class="value badge-status" id="meta-georef">-</span>
+                        </div>
+                        <div class="info-item" id="meta-bounds-container">
+                            <span class="label">Coordenadas Limite:</span>
+                            <span class="value code-block" id="meta-bounds">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+            </aside>
+            
+            <!-- Barra de Status Inferior -->
+            <footer class="viewer-status-bar glass-panel">
+                <div class="status-item">
+                    <i data-lucide="navigation"></i>
+                    <span id="coords-display">Cursor: --, --</span>
+                </div>
+                <div class="status-item" id="projection-display-container">
+                    <i data-lucide="globe"></i>
+                    <span id="projection-display">EPSG:4326 (WGS 84)</span>
+                </div>
+            </footer>
+        </div>
+        
+        <!-- Modais / Notificações -->
+        <div id="loading-overlay" class="overlay">
+            <div class="loader-content">
+                <div class="spinner"></div>
+                <h3 id="loader-title">Processando Imagem</h3>
+                <p id="loader-subtitle">Carregando dados raster e preparando visualização...</p>
+                <div class="progress-bar-container">
+                    <div id="loader-progress" class="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="notification" class="notification-toast">
+            <i class="icon" data-lucide="alert-circle"></i>
+            <span class="message">Ocorreu um erro ao carregar a imagem.</span>
+        </div>
+        
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- GeoTIFF.js Browser build from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.1/dist-browser/geotiff.js"></script>
+    
+    <!-- Custom Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
