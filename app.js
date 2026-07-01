@@ -411,7 +411,8 @@ async function loadProjectOrtho() {
         }
         
         // Prevent canvas crash on huge images without overviews
-        const MAX_DIM = 4096;
+        // Increase max dimension to 16384 for maximum quality (16K resolution limit)
+        const MAX_DIM = 16384;
         let targetWidth = width;
         let targetHeight = height;
         
@@ -456,8 +457,8 @@ async function loadProjectOrtho() {
             data[j] = r;
             data[j+1] = g;
             data[j+2] = b;
-            // Hide near-black nodata pixels
-            if (r < 5 && g < 5 && b < 5) {
+            // Hide near-black and near-white nodata pixels
+            if ((r < 5 && g < 5 && b < 5) || (r > 250 && g > 250 && b > 250)) {
                 data[j+3] = 0;
             } else {
                 data[j+3] = 255;
@@ -652,7 +653,8 @@ async function parseGeoTIFFBlob(blob) {
     }
     
     // Security to prevent Canvas Memory Limit Crash on huge images without overviews
-    const MAX_DIM = 4096;
+    // Increase max dimension to 16384 for maximum quality
+    const MAX_DIM = 16384;
     let targetWidth = width;
     let targetHeight = height;
     
@@ -697,8 +699,8 @@ async function parseGeoTIFFBlob(blob) {
         data[j+1] = g;
         data[j+2] = b;
         
-        // Hide near-black nodata pixels (very common in drone orthophotos)
-        if (r < 5 && g < 5 && b < 5) {
+        // Hide near-black and near-white nodata pixels (very common in drone orthophotos)
+        if ((r < 5 && g < 5 && b < 5) || (r > 250 && g > 250 && b > 250)) {
             data[j+3] = 0; // completely transparent alpha
         } else {
             data[j+3] = 255; // opaque
@@ -1299,6 +1301,9 @@ function switchScreen(screenId) {
     if (screenId === 'viewer-screen' && AppState.map) {
         setTimeout(() => {
             AppState.map.invalidateSize();
+            if (AppState.geotagBounds) {
+                AppState.map.fitBounds(AppState.geotagBounds);
+            }
         }, 100);
     }
 }
