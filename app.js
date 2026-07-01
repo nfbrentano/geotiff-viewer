@@ -99,6 +99,9 @@ function setupEventListeners() {
         }
     });
     
+    // Project file button
+    document.getElementById("btn-load-project-ortho").addEventListener('click', loadProjectOrtho);
+    
     // Demo Buttons
     document.getElementById("btn-demo-ortho").addEventListener('click', loadDemoOrtho);
     document.getElementById("btn-demo-geotiff").addEventListener('click', loadDemoGeoTIFF);
@@ -328,6 +331,212 @@ async function handleExternalUrl(url) {
 }
 
 /* ==========================================================================
+   PROJECT FILE LOADER (Fetch + fromBlob for servers without Range Request support)
+   ========================================================================== */
+async function loadProjectOrtho() {
+    const projectFileUrl = 'orto.tif'; // relative URL – served by the HTTP server
+    
+    AppState.fileName = 'orto.tif';
+    AppState.fileSize = 'Calculando...';
+    AppState.fileType = 'TIFF (GeoTIFF)';
+    
+    showLoading('Carregando orto.tif do projeto', 'Iniciando download do arquivo...', 5);
+    
+    try {
+        // Step 1: Download the file with progress tracking
+        const response = await fetch(projectFileUrl);
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status} ao baixar orto.tif`);
+        
+        const contentLength = response.headers.get('content-length');
+        const totalBytes = contentLength ? parseInt(contentLength) : 0;
+        
+        if (totalBytes > 0) {
+            AppState.fileSize = formatBytes(totalBytes);
+        }
+        
+        // Use ReadableStream to track download progress
+        let receivedBytes = 0;
+        const reader = response.body.getReader();
+        const chunks = [];
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            chunks.push(value);
+            receivedBytes += value.length;
+            
+            if (totalBytes > 0) {
+                const pct = Math.round((receivedBytes / totalBytes) * 40); // 0-40% for download
+                updateLoadingProgress(5 + pct);
+                const downloadedMB = (receivedBytes / 1048576).toFixed(1);
+                const totalMB = (totalBytes / 1048576).toFixed(1);
+                document.getElementById('loader-subtitle').textContent = 
+                    `Baixando: ${downloadedMB} MB / ${totalMB} MB (${Math.round(receivedBytes / totalBytes * 100)}%)`;
+            } else {
+                const downloadedMB = (receivedBytes / 1048576).toFixed(1);
+                document.getElementById('loader-subtitle').textContent = 
+                    `Baixando: ${downloadedMB} MB...`;
+            }
+        }
+        
+        // Combine chunks into a single Blob
+        const blob = new Blob(chunks);
+        
+        updateLoadingProgress(48);
+        document.getElementById('loader-subtitle').textContent = 'Lendo metadados do GeoTIFF...';
+        
+        // Step 2: Parse GeoTIFF from blob
+        const tiff = await GeoTIFF.fromBlob(blob);
+        
+        const imageCount = await tiff.getImageCount();
+        let image = await tiff.getImage(0);
+        
+        let width = image.getWidth();
+        let height = image.getHeight();
+        let bestIndex = 0;
+        
+        // Try to find an overview (lower resolution sub-image) that fits browser memory
+        for (let i = 0; i < imageCount; i++) {
+            const img = await tiff.getImage(i);
+            const w = img.getWidth();
+            const h = img.getHeight();
+            if (w <= 4096 && h <= 4096) {
+                image = img;
+                width = w;
+                height = h;
+                bestIndex = i;
+                break;
+            }
+        }
+        
+        // Prevent canvas crash on huge images without overviews
+        const MAX_DIM = 4096;
+        let targetWidth = width;
+        let targetHeight = height;
+        
+        if (targetWidth > MAX_DIM || targetHeight > MAX_DIM) {
+            const scale = Math.min(MAX_DIM / targetWidth, MAX_DIM / targetHeight);
+            targetWidth = Math.floor(targetWidth * scale);
+            targetHeight = Math.floor(targetHeight * scale);
+            console.warn(`Imagem reduzida para ${targetWidth}x${targetHeight} px (original: ${width}x${height}) para evitar travamento.`);
+        }
+        
+        AppState.dimensions = `${width} x ${height} px` + (bestIndex > 0 ? ` (Visão Geral #${bestIndex})` : '');
+        
+        // Get geographic info
+        const bbox = image.getBoundingBox();
+        const geoKeys = image.getGeoKeys();
+        
+        updateLoadingProgress(55);
+        document.getElementById('loader-subtitle').textContent = 'Decodificando bandas de cor (pode levar alguns segundos)...';
+        
+        // Read pixel data
+        const rgb = await image.readRGB({
+            window: [0, 0, width, height],
+            width: targetWidth,
+            height: targetHeight
+        });
+        
+        updateLoadingProgress(75);
+        document.getElementById('loader-subtitle').textContent = 'Renderizando imagem no canvas...';
+        
+        // Render to canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const imgData = ctx.createImageData(targetWidth, targetHeight);
+        const data = imgData.data;
+        
+        for (let i = 0, j = 0; i < rgb.length; i += 3, j += 4) {
+            const r = rgb[i];
+            const g = rgb[i+1];
+            const b = rgb[i+2];
+            data[j] = r;
+            data[j+1] = g;
+            data[j+2] = b;
+            // Hide near-black nodata pixels
+            if (r < 5 && g < 5 && b < 5) {
+                data[j+3] = 0;
+            } else {
+                data[j+3] = 255;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        
+        updateLoadingProgress(90);
+        document.getElementById('loader-subtitle').textContent = 'Construindo mapa espacial...';
+        
+        const dataUrl = canvas.toDataURL('image/webp', 0.92);
+        
+        // Georeferencing analysis (same logic as parseGeoTIFFBlob)
+        if (bbox && bbox.length === 4) {
+            const xmin = bbox[0], ymin = bbox[1], xmax = bbox[2], ymax = bbox[3];
+            
+            if (xmin >= -180 && xmax <= 180 && ymin >= -90 && ymax <= 90) {
+                AppState.isGeoreferenced = true;
+                AppState.geotagBounds = L.latLngBounds([ymin, xmin], [ymax, xmax]);
+                AppState.crsName = 'EPSG:4326 (WGS 84)';
+                
+                initMap('geographic');
+                AppState.orthophotoLayer = L.imageOverlay(dataUrl, AppState.geotagBounds, { crossOrigin: true }).addTo(AppState.map);
+                AppState.map.fitBounds(AppState.geotagBounds);
+            } else {
+                let projected = false;
+                let epsg = null;
+                
+                if (geoKeys) {
+                    epsg = geoKeys.ProjectedCSTypeGeoKey || geoKeys.GeographicTypeGeoKey;
+                }
+                
+                if (epsg) {
+                    try {
+                        await loadProj4();
+                        const projDef = getProjCodeDefinition(epsg);
+                        if (projDef) {
+                            proj4.defs(`EPSG:${epsg}`, projDef);
+                            const wgs84 = '+proj=longlat +datum=WGS84 +no_defs';
+                            const minProj = proj4(`EPSG:${epsg}`, wgs84, [xmin, ymin]);
+                            const maxProj = proj4(`EPSG:${epsg}`, wgs84, [xmax, ymax]);
+                            
+                            const bounds = L.latLngBounds([minProj[1], minProj[0]], [maxProj[1], maxProj[0]]);
+                            
+                            AppState.isGeoreferenced = true;
+                            AppState.geotagBounds = bounds;
+                            AppState.crsName = `EPSG:${epsg} (Projetado)`;
+                            
+                            initMap('geographic');
+                            AppState.orthophotoLayer = L.imageOverlay(dataUrl, bounds, { crossOrigin: true }).addTo(AppState.map);
+                            AppState.map.fitBounds(bounds);
+                            projected = true;
+                        }
+                    } catch (e) {
+                        console.error('Falha ao projetar via Proj4:', e);
+                    }
+                }
+                
+                if (!projected) {
+                    setupFlatMapDisplay(dataUrl, width, height, 'Métrica UTM (Sem CRS no Navegador)');
+                }
+            }
+        } else {
+            setupFlatMapDisplay(dataUrl, width, height, 'Não Georreferenciado');
+        }
+        
+        updateMetadataDisplay();
+        switchScreen('viewer-screen');
+        hideLoading();
+        showToast('orto.tif carregado com sucesso!', 'success');
+        
+    } catch (err) {
+        console.error('Erro ao carregar orto.tif do projeto:', err);
+        hideLoading();
+        showToast(err.message || 'Erro ao carregar o arquivo orto.tif do projeto.');
+    }
+}
+
+/* ==========================================================================
    DEMO LOADERS
    ========================================================================== */
 function loadDemoOrtho() {
@@ -442,6 +651,18 @@ async function parseGeoTIFFBlob(blob) {
         }
     }
     
+    // Security to prevent Canvas Memory Limit Crash on huge images without overviews
+    const MAX_DIM = 4096;
+    let targetWidth = width;
+    let targetHeight = height;
+    
+    if (targetWidth > MAX_DIM || targetHeight > MAX_DIM) {
+        const scale = Math.min(MAX_DIM / targetWidth, MAX_DIM / targetHeight);
+        targetWidth = Math.floor(targetWidth * scale);
+        targetHeight = Math.floor(targetHeight * scale);
+        console.warn(`Imagem muito grande sem visões gerais adequadas. Reduzindo renderização para ${targetWidth}x${targetHeight} px para evitar travamento.`);
+    }
+    
     AppState.dimensions = `${width} x ${height} px` + (bestIndex > 0 ? ` (Visão Geral #${bestIndex})` : '');
     
     // Try to get geographic bounding box
@@ -453,15 +674,17 @@ async function parseGeoTIFFBlob(blob) {
     
     // Read pixel data
     const rgb = await image.readRGB({
-        window: [0, 0, width, height]
+        window: [0, 0, width, height],
+        width: targetWidth,
+        height: targetHeight
     });
     
     // Render RGB data to canvas
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    const imgData = ctx.createImageData(width, height);
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const imgData = ctx.createImageData(targetWidth, targetHeight);
     const data = imgData.data;
     
     // Draw RGB and implement smart transparency: pure black border pixels (nodata) are set to transparent

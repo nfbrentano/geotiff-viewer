@@ -388,6 +388,30 @@ body, html {
     max-width: 200px;
 }
 
+/* Accent button for project file loading */
+.btn-accent {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    border: none;
+    color: white;
+    font-weight: 600;
+    max-width: 320px !important;
+    box-shadow: 0 4px 20px rgba(32, 190, 198, 0.3);
+    transition: all 0.3s ease;
+}
+
+.btn-accent:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(32, 190, 198, 0.5);
+}
+
+.project-file-section {
+    border-top: 1px solid rgba(32, 190, 198, 0.2) !important;
+    background: rgba(32, 190, 198, 0.03);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-top: 1.5rem;
+}
+
 /* Footer */
 .upload-footer {
     text-align: center;
