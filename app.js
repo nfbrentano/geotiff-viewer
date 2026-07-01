@@ -337,10 +337,11 @@ function loadDemoOrtho() {
     
     showLoading("Carregando Ortofoto Demo", "Renderizando ortofoto da área industrial...", 50);
     
-    // High-resolution industrial construction aerial photograph
-    const demoUrl = "https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&q=80&w=2000";
+    // High-resolution aerial photograph from Wikimedia Commons
+    const demoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Aerial_photograph_of_the_Ouse_Valley_Viaduct.jpg/1280px-Aerial_photograph_of_the_Ouse_Valley_Viaduct.jpg";
     
     const img = new Image();
+    img.crossOrigin = "Anonymous";
     img.src = demoUrl;
     img.onload = () => {
         displayStandardImage(demoUrl, img.width, img.height);
@@ -395,12 +396,12 @@ function simulateGeoreferencedDemo() {
     AppState.crsName = "EPSG:31982 (SIRGAS 2000 / UTM zone 22S)";
     AppState.dimensions = "2400 x 1800 px";
     
-    // Load a nice drone crop image
-    const simulatedImage = "https://images.unsplash.com/photo-1579847259164-e4615c8c60f4?auto=format&fit=crop&q=80&w=1500";
+    // Load a nice aerial image
+    const simulatedImage = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Kolkata_aerial_view.jpg/1280px-Kolkata_aerial_view.jpg";
     
     initMap('geographic');
     
-    AppState.orthophotoLayer = L.imageOverlay(simulatedImage, bounds).addTo(AppState.map);
+    AppState.orthophotoLayer = L.imageOverlay(simulatedImage, bounds, { crossOrigin: true }).addTo(AppState.map);
     AppState.map.fitBounds(bounds);
     
     updateMetadataDisplay();
@@ -501,7 +502,7 @@ async function parseGeoTIFFBlob(blob) {
             AppState.crsName = "EPSG:4326 (WGS 84)";
             
             initMap('geographic');
-            AppState.orthophotoLayer = L.imageOverlay(dataUrl, AppState.geotagBounds).addTo(AppState.map);
+            AppState.orthophotoLayer = L.imageOverlay(dataUrl, AppState.geotagBounds, { crossOrigin: true }).addTo(AppState.map);
             AppState.map.fitBounds(AppState.geotagBounds);
         } else {
             // Coordinates are projected (e.g. UTM meters). Try to load Proj4 and project.
@@ -530,7 +531,7 @@ async function parseGeoTIFFBlob(blob) {
                         AppState.crsName = `EPSG:${epsg} (Projetado)`;
                         
                         initMap('geographic');
-                        AppState.orthophotoLayer = L.imageOverlay(dataUrl, bounds).addTo(AppState.map);
+                        AppState.orthophotoLayer = L.imageOverlay(dataUrl, bounds, { crossOrigin: true }).addTo(AppState.map);
                         AppState.map.fitBounds(bounds);
                         projected = true;
                     }
@@ -583,7 +584,7 @@ function setupFlatMapDisplay(dataUrl, width, height, crsLabel) {
     initMap('flat');
     
     const bounds = AppState.geotagBounds;
-    AppState.orthophotoLayer = L.imageOverlay(dataUrl, bounds).addTo(AppState.map);
+    AppState.orthophotoLayer = L.imageOverlay(dataUrl, bounds, { crossOrigin: true }).addTo(AppState.map);
     AppState.map.fitBounds(bounds);
 }
 
