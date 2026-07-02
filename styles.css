@@ -1246,6 +1246,22 @@ body, html {
     }
 }
 
+/* Sidebar divider and calibration hint styles */
+.sidebar-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    margin: 0.75rem 0;
+}
+
+.input-hint {
+    display: block;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 4px;
+    line-height: 1.3;
+    font-style: italic;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after {
         animation-duration: 0.01ms !important;

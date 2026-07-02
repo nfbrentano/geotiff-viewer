@@ -46,7 +46,9 @@ const AppState = {
         distance: 1.0,
         ambientTemp: 20.0,
         simMinTemp: 15.0,
-        simMaxTemp: 45.0
+        simMaxTemp: 45.0,
+        calibGain: 1.0,
+        calibOffset: 0.0
     },
     isSimulatedThermal: false
 };
@@ -231,6 +233,14 @@ function setupEventListeners() {
     });
     document.getElementById('thermal-sim-max').addEventListener('input', (e) => {
         AppState.thermalParams.simMaxTemp = parseFloat(e.target.value);
+        updateThermalMeasurements();
+    });
+    document.getElementById('thermal-calib-gain').addEventListener('input', (e) => {
+        AppState.thermalParams.calibGain = parseFloat(e.target.value) || 1.0;
+        updateThermalMeasurements();
+    });
+    document.getElementById('thermal-calib-offset').addEventListener('input', (e) => {
+        AppState.thermalParams.calibOffset = parseFloat(e.target.value) || 0.0;
         updateThermalMeasurements();
     });
     
@@ -1583,22 +1593,15 @@ function calculateTemperature(rawPixelValue) {
         return minT + (ratio * (maxT - minT));
     }
 
-    // [PLACEHOLDER FORMULA]
-    // The exact radiometric formula depends on the drone/camera model (e.g. DJI Zenmuse, FLIR).
-    // Often, standard TIFFs store `Celsius * 100` or direct Celsius.
-    // This is a mock formula demonstrating the use of the user parameters.
-    const emissivity = AppState.thermalParams.emissivity || 0.95;
-    const distance = AppState.thermalParams.distance || 1.0;
-    const ambient = AppState.thermalParams.ambientTemp || 20.0;
+    // For DJI Mavic 3 Thermal (M3T) and similar cameras, the TIFF stores
+    // temperature directly in Celsius. We apply a linear calibration:
+    //   T_calibrated = gain × T_raw + offset
+    // Default gain=1.0 and offset=0.0 means no adjustment.
+    // Users can tweak these values to match a reference thermometer reading.
+    const gain = AppState.thermalParams.calibGain;
+    const offset = AppState.thermalParams.calibOffset;
     
-    // Assume rawPixelValue is degrees Celsius for this demo
-    const tApparent = rawPixelValue;
-    
-    // Mock adjustment: slightly increase temp based on lower emissivity and higher distance
-    // In reality, you'd use Planck's formula constants from TIFF metadata.
-    const tReal = tApparent / Math.pow(emissivity, 0.25) + (distance * 0.005) + (ambient * 0.01);
-    
-    return tReal;
+    return (gain * rawPixelValue) + offset;
 }
 
 function getThermalPixelValue(latlng) {
