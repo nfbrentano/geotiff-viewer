@@ -44,8 +44,11 @@ const AppState = {
     thermalParams: {
         emissivity: 0.95,
         distance: 1.0,
-        ambientTemp: 20.0
-    }
+        ambientTemp: 20.0,
+        simMinTemp: 15.0,
+        simMaxTemp: 45.0
+    },
+    isSimulatedThermal: false
 };
 
 // Initialize on page load
@@ -109,7 +112,10 @@ function setupEventListeners() {
     });
     
     // Project file button
-    document.getElementById("btn-load-project-ortho").addEventListener('click', loadProjectOrtho);
+    const btnLoadProjectOrtho = document.getElementById("btn-load-project-ortho");
+    if (btnLoadProjectOrtho) {
+        btnLoadProjectOrtho.addEventListener('click', loadProjectOrtho);
+    }
     
     // Demo Buttons
     document.getElementById("btn-demo-ortho").addEventListener('click', loadDemoOrtho);
@@ -195,8 +201,8 @@ function setupEventListeners() {
         btn.addEventListener('click', (e) => {
             tabBtns.forEach(b => b.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
-            const targetTab = e.target.getAttribute('data-tab');
-            e.target.classList.add('active');
+            const targetTab = e.currentTarget.getAttribute('data-tab');
+            e.currentTarget.classList.add('active');
             document.getElementById(targetTab).classList.add('active');
             
             // Auto-disable measurements when switching tabs
@@ -217,6 +223,14 @@ function setupEventListeners() {
     });
     document.getElementById('thermal-ambient').addEventListener('input', (e) => {
         AppState.thermalParams.ambientTemp = parseFloat(e.target.value);
+        updateThermalMeasurements();
+    });
+    document.getElementById('thermal-sim-min').addEventListener('input', (e) => {
+        AppState.thermalParams.simMinTemp = parseFloat(e.target.value);
+        updateThermalMeasurements();
+    });
+    document.getElementById('thermal-sim-max').addEventListener('input', (e) => {
+        AppState.thermalParams.simMaxTemp = parseFloat(e.target.value);
         updateThermalMeasurements();
     });
     
@@ -354,6 +368,7 @@ async function handleExternalUrl(url) {
             img.src = directUrl;
             
             img.onload = () => {
+                extractSimulatedThermalData(img);
                 displayStandardImage(directUrl, img.width, img.height);
                 hideLoading();
                 showToast("Ortofoto carregada com sucesso!", "success");
@@ -441,7 +456,9 @@ async function loadProjectOrtho() {
         const tiff = await GeoTIFF.fromBlob(blob);
         
         const imageCount = await tiff.getImageCount();
-        let image = await tiff.getImage(0);
+        let image0 = await tiff.getImage(0);
+        extractThermalMetadata(image0);
+        let image = image0;
         
         let width = image.getWidth();
         let height = image.getHeight();
@@ -489,6 +506,18 @@ async function loadProjectOrtho() {
             width: targetWidth,
             height: targetHeight
         });
+        
+        // Read raw raster data for thermal analysis
+        try {
+            const rawRasters = await image.readRasters({ window: [0, 0, width, height], width: targetWidth, height: targetHeight });
+            if (rawRasters && rawRasters.length > 0) {
+                AppState.rawThermalData = rawRasters[0];
+                AppState.thermalWidth = targetWidth;
+                AppState.thermalHeight = targetHeight;
+            }
+        } catch (err) {
+            console.warn("Could not read raw rasters for thermal analysis", err);
+        }
         
         updateLoadingProgress(75);
         document.getElementById('loader-subtitle').textContent = 'Renderizando imagem no canvas...';
@@ -605,6 +634,7 @@ function loadDemoOrtho() {
     img.crossOrigin = "Anonymous";
     img.src = demoUrl;
     img.onload = () => {
+        extractSimulatedThermalData(img);
         displayStandardImage(demoUrl, img.width, img.height);
         hideLoading();
         showToast("Ortofoto Demo carregada!", "success");
@@ -671,18 +701,78 @@ function simulateGeoreferencedDemo() {
 }
 
 /* ==========================================================================
+   THERMAL METADATA EXTRACTION
+   ========================================================================== */
+function extractThermalMetadata(image) {
+    try {
+        const fd = image.getFileDirectory();
+        let metadataString = '';
+        
+        // 1. Try GDAL_METADATA (tag 42112)
+        if (fd[42112] && typeof fd[42112] === 'string') {
+            metadataString += fd[42112] + ' ';
+        }
+        
+        // 2. Try XMP (tag 700)
+        if (fd[700]) {
+            if (typeof fd[700] === 'string') {
+                metadataString += fd[700] + ' ';
+            } else if (fd[700] instanceof Uint8Array) {
+                metadataString += new TextDecoder().decode(fd[700]) + ' ';
+            }
+        }
+        
+        // 3. Try ImageDescription (tag 270)
+        if (fd[270] && typeof fd[270] === 'string') {
+            metadataString += fd[270] + ' ';
+        }
+
+        if (metadataString) {
+            const emissivityMatch = metadataString.match(/Emissivity.*?([\d.]+)/i);
+            if (emissivityMatch) {
+                const val = parseFloat(emissivityMatch[1]);
+                if (!isNaN(val) && val > 0 && val <= 1) {
+                    AppState.thermalParams.emissivity = val;
+                    const el = document.getElementById('thermal-emissivity');
+                    if(el) el.value = val;
+                }
+            }
+            const distanceMatch = metadataString.match(/ObjectDistance.*?([\d.]+)/i);
+            if (distanceMatch) {
+                const val = parseFloat(distanceMatch[1]);
+                if (!isNaN(val)) {
+                    AppState.thermalParams.distance = val;
+                    const el = document.getElementById('thermal-distance');
+                    if(el) el.value = val;
+                }
+            }
+            const ambientMatch = metadataString.match(/AtmosphericTemperature.*?([\d.]+)/i) || metadataString.match(/AmbientTemperature.*?([\d.]+)/i);
+            if (ambientMatch) {
+                const val = parseFloat(ambientMatch[1]);
+                if (!isNaN(val)) {
+                    AppState.thermalParams.ambient = val;
+                    const el = document.getElementById('thermal-ambient');
+                    if(el) el.value = val;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Could not extract thermal metadata:", e);
+    }
+}
+
+/* ==========================================================================
    GEOTIFF PARSING (geotiff.js)
    ========================================================================== */
 async function parseGeoTIFFBlob(blob) {
-    updateLoadingProgress(50);
-    document.getElementById("loader-subtitle").textContent = "Lendo metadados do GeoTIFF...";
+    showLoading("Processando GeoTIFF", "Analisando estrutura do arquivo...", 40);
     
-    // Usamos GeoTIFF.fromBlob(blob) diretamente em vez de blob.arrayBuffer().
-    // Isso lê apenas os cabeçalhos do arquivo sob demanda, poupando memória RAM para arquivos de centenas de megabytes.
     const tiff = await GeoTIFF.fromBlob(blob);
     
     const imageCount = await tiff.getImageCount();
-    let image = await tiff.getImage(0);
+    let image0 = await tiff.getImage(0);
+    extractThermalMetadata(image0);
+    let image = image0;
     
     // Find an overview image suitable for browser display memory constraints
     // If the full resolution is > 4096px, read the next readable scale
@@ -850,11 +940,42 @@ async function parseStandardImageBlob(file) {
         const img = new Image();
         img.src = dataUrl;
         img.onload = () => {
+            extractSimulatedThermalData(img);
             displayStandardImage(dataUrl, img.width, img.height);
             hideLoading();
         };
     };
     reader.readAsDataURL(file);
+}
+
+function extractSimulatedThermalData(img) {
+    try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        const imgData = ctx.getImageData(0, 0, img.width, img.height);
+        const data = imgData.data;
+        
+        const rawRasters = new Float32Array(img.width * img.height);
+        for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
+            // Luminance/brightness (0-255)
+            const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+            rawRasters[j] = brightness;
+        }
+        
+        AppState.rawThermalData = rawRasters;
+        AppState.thermalWidth = img.width;
+        AppState.thermalHeight = img.height;
+        AppState.isSimulatedThermal = true;
+    } catch (e) {
+        console.warn("Could not extract simulated thermal data (CORS or canvas error).", e);
+        AppState.isSimulatedThermal = false;
+    }
 }
 
 function displayStandardImage(dataUrl, width, height) {
@@ -1419,6 +1540,12 @@ function exitViewer() {
     document.getElementById("url-input").value = "";
     document.getElementById("file-input").value = "";
     
+    // Clear thermal data
+    AppState.rawThermalData = null;
+    AppState.thermalWidth = 0;
+    AppState.thermalHeight = 0;
+    AppState.isSimulatedThermal = false;
+    
     switchScreen('upload-screen');
 }
 
@@ -1449,6 +1576,13 @@ function getUrlFileName(url) {
    ========================================================================== */
 
 function calculateTemperature(rawPixelValue) {
+    if (AppState.isSimulatedThermal) {
+        const minT = AppState.thermalParams.simMinTemp;
+        const maxT = AppState.thermalParams.simMaxTemp;
+        const ratio = rawPixelValue / 255.0;
+        return minT + (ratio * (maxT - minT));
+    }
+
     // [PLACEHOLDER FORMULA]
     // The exact radiometric formula depends on the drone/camera model (e.g. DJI Zenmuse, FLIR).
     // Often, standard TIFFs store `Celsius * 100` or direct Celsius.
