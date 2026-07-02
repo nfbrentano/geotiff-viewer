@@ -32,11 +32,20 @@ const AppState = {
     measurementMarkers: [],  // Array of L.Marker
     measurementLine: null,   // L.Polyline (drawing preview or finalized path)
     measurementPolygon: null,// L.Polygon
-    tempLine: null,          // L.Polyline for cursor follow effect
     tempPolygon: null,       // L.Polygon for cursor follow effect
     
     // Scale for non-georeferenced images (pixel to meters coefficient)
-    pixelToMetersScale: 0.05 // default 5cm per pixel (typical drone orthophoto GSD)
+    pixelToMetersScale: 0.05, // default 5cm per pixel (typical drone orthophoto GSD)
+    
+    // Thermal Analysis State
+    rawThermalData: null,
+    thermalWidth: 0,
+    thermalHeight: 0,
+    thermalParams: {
+        emissivity: 0.95,
+        distance: 1.0,
+        ambientTemp: 20.0
+    }
 };
 
 // Initialize on page load
@@ -179,13 +188,55 @@ function setupEventListeners() {
         updateLayerStyles();
     });
     
-    // Measurement tools
+    // Sidebar Tabs
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            const targetTab = e.target.getAttribute('data-tab');
+            e.target.classList.add('active');
+            document.getElementById(targetTab).classList.add('active');
+            
+            // Auto-disable measurements when switching tabs
+            if (AppState.measurementMode !== 'none') {
+                toggleMeasurementMode(AppState.measurementMode); // will turn it off
+            }
+        });
+    });
+    
+    // Thermal Parameters
+    document.getElementById('thermal-emissivity').addEventListener('input', (e) => {
+        AppState.thermalParams.emissivity = parseFloat(e.target.value);
+        updateThermalMeasurements();
+    });
+    document.getElementById('thermal-distance').addEventListener('input', (e) => {
+        AppState.thermalParams.distance = parseFloat(e.target.value);
+        updateThermalMeasurements();
+    });
+    document.getElementById('thermal-ambient').addEventListener('input', (e) => {
+        AppState.thermalParams.ambientTemp = parseFloat(e.target.value);
+        updateThermalMeasurements();
+    });
+    
+    // Measurement tools (Geral)
     const btnMeasureDist = document.getElementById("tool-measure-dist");
     const btnMeasureArea = document.getElementById("tool-measure-area");
     
     btnMeasureDist.addEventListener('click', () => toggleMeasurementMode('distance'));
     btnMeasureArea.addEventListener('click', () => toggleMeasurementMode('area'));
     document.getElementById("btn-clear-measurement").addEventListener('click', clearMeasurement);
+    
+    // Measurement tools (Thermal)
+    const btnThermalPoint = document.getElementById("tool-thermal-point");
+    const btnThermalLine = document.getElementById("tool-thermal-line");
+    const btnThermalArea = document.getElementById("tool-thermal-area");
+    
+    btnThermalPoint.addEventListener('click', () => toggleMeasurementMode('thermal-point'));
+    btnThermalLine.addEventListener('click', () => toggleMeasurementMode('thermal-line'));
+    btnThermalArea.addEventListener('click', () => toggleMeasurementMode('thermal-area'));
+    document.getElementById("btn-clear-thermal").addEventListener('click', clearMeasurement);
 }
 
 /* ==========================================================================
@@ -681,6 +732,18 @@ async function parseGeoTIFFBlob(blob) {
         height: targetHeight
     });
     
+    // Read raw raster data for thermal analysis
+    try {
+        const rawRasters = await image.readRasters({ window: [0, 0, width, height], width: targetWidth, height: targetHeight });
+        if (rawRasters && rawRasters.length > 0) {
+            AppState.rawThermalData = rawRasters[0];
+            AppState.thermalWidth = targetWidth;
+            AppState.thermalHeight = targetHeight;
+        }
+    } catch (err) {
+        console.warn("Could not read raw rasters for thermal analysis", err);
+    }
+    
     // Render RGB data to canvas
     const canvas = document.createElement("canvas");
     canvas.width = targetWidth;
@@ -916,9 +979,15 @@ function toggleMeasurementMode(mode) {
     
     const btnDist = document.getElementById("tool-measure-dist");
     const btnArea = document.getElementById("tool-measure-area");
+    const btnThermPoint = document.getElementById("tool-thermal-point");
+    const btnThermLine = document.getElementById("tool-thermal-line");
+    const btnThermArea = document.getElementById("tool-thermal-area");
     
     btnDist.classList.remove('active');
     btnArea.classList.remove('active');
+    btnThermPoint.classList.remove('active');
+    btnThermLine.classList.remove('active');
+    btnThermArea.classList.remove('active');
     
     const container = AppState.map.getContainer();
     container.style.cursor = 'crosshair';
@@ -929,6 +998,18 @@ function toggleMeasurementMode(mode) {
     } else if (mode === 'area') {
         btnArea.classList.add('active');
         showToast("Modo Medição de Área Ativo. Clique para contornar a área (mínimo 3 pontos).", "success");
+    } else if (mode === 'thermal-point') {
+        if (!AppState.rawThermalData) return showToast("Sem dados termais no TIFF carregado.");
+        btnThermPoint.classList.add('active');
+        showToast("Termal Ponto Ativo. Clique em um local para ver a temperatura.", "success");
+    } else if (mode === 'thermal-line') {
+        if (!AppState.rawThermalData) return showToast("Sem dados termais no TIFF carregado.");
+        btnThermLine.classList.add('active');
+        showToast("Termal Linha Ativo. Clique para traçar e ver as temperaturas na linha.", "success");
+    } else if (mode === 'thermal-area') {
+        if (!AppState.rawThermalData) return showToast("Sem dados termais no TIFF carregado.");
+        btnThermArea.classList.add('active');
+        showToast("Termal Área Ativo. Contorne uma área para obter estatísticas.", "success");
     }
 }
 
@@ -936,6 +1017,10 @@ function deactivateMeasurementMode() {
     AppState.measurementMode = 'none';
     document.getElementById("tool-measure-dist").classList.remove('active');
     document.getElementById("tool-measure-area").classList.remove('active');
+    
+    document.getElementById("tool-thermal-point").classList.remove('active');
+    document.getElementById("tool-thermal-line").classList.remove('active');
+    document.getElementById("tool-thermal-area").classList.remove('active');
     
     if (AppState.map) {
         AppState.map.getContainer().style.cursor = '';
@@ -963,6 +1048,7 @@ function clearMeasurement() {
     AppState.measurementPoints = [];
     
     document.getElementById("measurement-info").classList.add("hidden");
+    document.getElementById("thermal-measurement-info").classList.add("hidden");
 }
 
 function removeTempLayers() {
@@ -995,22 +1081,24 @@ function onMapClick(e) {
     
     const pointsCount = AppState.measurementPoints.length;
     
-    if (AppState.measurementMode === 'distance') {
+    if (AppState.measurementMode === 'distance' || AppState.measurementMode === 'thermal-line') {
         if (!AppState.measurementLine) {
             AppState.measurementLine = L.polyline(AppState.measurementPoints, {
-                className: 'measurement-line'
+                className: AppState.measurementMode.includes('thermal') ? 'thermal-line' : 'measurement-line'
             }).addTo(AppState.map);
         } else {
             AppState.measurementLine.setLatLngs(AppState.measurementPoints);
         }
         
-        updateDistanceResult();
-    } else if (AppState.measurementMode === 'area') {
+        if (AppState.measurementMode === 'distance') updateDistanceResult();
+        else updateThermalMeasurements();
+        
+    } else if (AppState.measurementMode === 'area' || AppState.measurementMode === 'thermal-area') {
         // Line representation for < 3 points
         if (pointsCount < 3) {
             if (!AppState.measurementLine) {
                 AppState.measurementLine = L.polyline(AppState.measurementPoints, {
-                    className: 'measurement-line'
+                    className: AppState.measurementMode.includes('thermal') ? 'thermal-line' : 'measurement-line'
                 }).addTo(AppState.map);
             } else {
                 AppState.measurementLine.setLatLngs(AppState.measurementPoints);
@@ -1024,14 +1112,24 @@ function onMapClick(e) {
             
             if (!AppState.measurementPolygon) {
                 AppState.measurementPolygon = L.polygon(AppState.measurementPoints, {
-                    className: 'measurement-polygon'
+                    className: AppState.measurementMode.includes('thermal') ? 'thermal-polygon' : 'measurement-polygon'
                 }).addTo(AppState.map);
             } else {
                 AppState.measurementPolygon.setLatLngs(AppState.measurementPoints);
             }
             
-            updateAreaResult();
+            if (AppState.measurementMode === 'area') updateAreaResult();
+            else updateThermalMeasurements();
         }
+    } else if (AppState.measurementMode === 'thermal-point') {
+        // For point, we only want 1 marker at a time
+        if (AppState.measurementMarkers.length > 1) {
+            // remove previous
+            AppState.map.removeLayer(AppState.measurementMarkers[0]);
+            AppState.measurementMarkers.shift();
+            AppState.measurementPoints.shift();
+        }
+        updateThermalMeasurements();
     }
 }
 
@@ -1054,21 +1152,21 @@ function onMapMouseMove(e) {
     
     removeTempLayers();
     
-    if (AppState.measurementMode === 'distance') {
+    if (AppState.measurementMode === 'distance' || AppState.measurementMode === 'thermal-line') {
         AppState.tempLine = L.polyline([startPoint, latlng], {
-            className: 'measurement-temp-line'
+            className: AppState.measurementMode.includes('thermal') ? 'thermal-temp-line' : 'measurement-temp-line'
         }).addTo(AppState.map);
-    } else if (AppState.measurementMode === 'area') {
+    } else if (AppState.measurementMode === 'area' || AppState.measurementMode === 'thermal-area') {
         const pointsCount = AppState.measurementPoints.length;
         if (pointsCount === 1) {
             AppState.tempLine = L.polyline([startPoint, latlng], {
-                className: 'measurement-temp-line'
+                className: AppState.measurementMode.includes('thermal') ? 'thermal-temp-line' : 'measurement-temp-line'
             }).addTo(AppState.map);
         } else if (pointsCount >= 2) {
             // Draw a temporary polygon overlay including the cursor
             const polygonPoints = [...AppState.measurementPoints, latlng];
             AppState.tempPolygon = L.polygon(polygonPoints, {
-                className: 'measurement-polygon',
+                className: AppState.measurementMode.includes('thermal') ? 'thermal-polygon' : 'measurement-polygon',
                 dashArray: '5, 5'
             }).addTo(AppState.map);
         }
@@ -1344,4 +1442,177 @@ function getUrlFileName(url) {
     } catch (e) {
         return "";
     }
+}
+
+/* ==========================================================================
+   THERMAL ANALYSIS
+   ========================================================================== */
+
+function calculateTemperature(rawPixelValue) {
+    // [PLACEHOLDER FORMULA]
+    // The exact radiometric formula depends on the drone/camera model (e.g. DJI Zenmuse, FLIR).
+    // Often, standard TIFFs store `Celsius * 100` or direct Celsius.
+    // This is a mock formula demonstrating the use of the user parameters.
+    const emissivity = AppState.thermalParams.emissivity || 0.95;
+    const distance = AppState.thermalParams.distance || 1.0;
+    const ambient = AppState.thermalParams.ambientTemp || 20.0;
+    
+    // Assume rawPixelValue is degrees Celsius for this demo
+    const tApparent = rawPixelValue;
+    
+    // Mock adjustment: slightly increase temp based on lower emissivity and higher distance
+    // In reality, you'd use Planck's formula constants from TIFF metadata.
+    const tReal = tApparent / Math.pow(emissivity, 0.25) + (distance * 0.005) + (ambient * 0.01);
+    
+    return tReal;
+}
+
+function getThermalPixelValue(latlng) {
+    if (!AppState.rawThermalData) return null;
+    if (!AppState.orthophotoLayer) return null;
+    
+    // Get image bounds and dimensions
+    const bounds = AppState.geotagBounds || AppState.orthophotoLayer.getBounds();
+    const w = AppState.thermalWidth;
+    const h = AppState.thermalHeight;
+    
+    let x, y;
+    
+    if (AppState.isGeoreferenced) {
+        // Map latlng to pixel coordinates
+        const latRatio = (bounds.getNorth() - latlng.lat) / (bounds.getNorth() - bounds.getSouth());
+        const lngRatio = (latlng.lng - bounds.getWest()) / (bounds.getEast() - bounds.getWest());
+        
+        x = Math.floor(lngRatio * w);
+        y = Math.floor(latRatio * h);
+    } else {
+        // Flat coordinates
+        x = Math.floor(latlng.lng);
+        // Leaflet flat coords with typical bounds [0,0] to [-H, W] means lat is negative
+        y = Math.floor(Math.abs(latlng.lat));
+    }
+    
+    if (x < 0 || x >= w || y < 0 || y >= h) return null;
+    
+    const index = y * w + x;
+    return AppState.rawThermalData[index];
+}
+
+function updateThermalMeasurements() {
+    if (!AppState.rawThermalData) return;
+    if (AppState.measurementPoints.length === 0) return;
+    
+    const infoBox = document.getElementById("thermal-measurement-info");
+    const rowPoint = document.getElementById("thermal-point-row");
+    const rowStats = document.getElementById("thermal-stats-row");
+    
+    infoBox.classList.remove("hidden");
+    
+    if (AppState.measurementMode === 'thermal-point') {
+        const rawVal = getThermalPixelValue(AppState.measurementPoints[0]);
+        if (rawVal !== null && !isNaN(rawVal)) {
+            const temp = calculateTemperature(rawVal);
+            document.getElementById("thermal-temp-point").textContent = `${temp.toFixed(2)} °C`;
+        } else {
+            document.getElementById("thermal-temp-point").textContent = "N/D";
+        }
+        rowPoint.classList.remove("hidden");
+        rowStats.classList.add("hidden");
+        
+    } else if (AppState.measurementMode === 'thermal-line') {
+        if (AppState.measurementPoints.length < 2) return;
+        
+        // Sample points along the line
+        const values = [];
+        for (let i = 0; i < AppState.measurementPoints.length - 1; i++) {
+            const p1 = AppState.measurementPoints[i];
+            const p2 = AppState.measurementPoints[i+1];
+            // Sample 100 points per segment for demo
+            for (let t = 0; t <= 1; t += 0.05) {
+                const lat = p1.lat + (p2.lat - p1.lat) * t;
+                const lng = p1.lng + (p2.lng - p1.lng) * t;
+                const rawVal = getThermalPixelValue(L.latLng(lat, lng));
+                if (rawVal !== null && !isNaN(rawVal)) {
+                    values.push(calculateTemperature(rawVal));
+                }
+            }
+        }
+        
+        displayThermalStats(values);
+        rowPoint.classList.add("hidden");
+        rowStats.classList.remove("hidden");
+        
+    } else if (AppState.measurementMode === 'thermal-area') {
+        if (AppState.measurementPoints.length < 3) return;
+        
+        // For a true area calculation, we'd need point-in-polygon for every pixel.
+        // For performance in browser JS, we sample points within the bounding box of the polygon.
+        const lats = AppState.measurementPoints.map(p => p.lat);
+        const lngs = AppState.measurementPoints.map(p => p.lng);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        
+        const values = [];
+        // Sample a grid inside the bounding box
+        const steps = 30; // 30x30 grid
+        const latStep = (maxLat - minLat) / steps;
+        const lngStep = (maxLng - minLng) / steps;
+        
+        // Simple ray casting point-in-polygon
+        const isInside = (pt, vs) => {
+            let inside = false;
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                const xi = vs[i].lng, yi = vs[i].lat;
+                const xj = vs[j].lng, yj = vs[j].lat;
+                const intersect = ((yi > pt.lat) != (yj > pt.lat))
+                    && (pt.lng < (xj - xi) * (pt.lat - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        };
+        
+        for (let lat = minLat; lat <= maxLat; lat += latStep) {
+            for (let lng = minLng; lng <= maxLng; lng += lngStep) {
+                const pt = L.latLng(lat, lng);
+                if (isInside(pt, AppState.measurementPoints)) {
+                    const rawVal = getThermalPixelValue(pt);
+                    if (rawVal !== null && !isNaN(rawVal)) {
+                        values.push(calculateTemperature(rawVal));
+                    }
+                }
+            }
+        }
+        
+        displayThermalStats(values);
+        rowPoint.classList.add("hidden");
+        rowStats.classList.remove("hidden");
+    }
+}
+
+function displayThermalStats(values) {
+    if (values.length === 0) {
+        document.getElementById("thermal-temp-min").textContent = "N/D";
+        document.getElementById("thermal-temp-max").textContent = "N/D";
+        document.getElementById("thermal-temp-avg").textContent = "N/D";
+        return;
+    }
+    
+    let min = Infinity;
+    let max = -Infinity;
+    let sum = 0;
+    
+    for (let i = 0; i < values.length; i++) {
+        const v = values[i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+        sum += v;
+    }
+    
+    const avg = sum / values.length;
+    
+    document.getElementById("thermal-temp-min").textContent = `${min.toFixed(2)} °C`;
+    document.getElementById("thermal-temp-max").textContent = `${max.toFixed(2)} °C`;
+    document.getElementById("thermal-temp-avg").textContent = `${avg.toFixed(2)} °C`;
 }

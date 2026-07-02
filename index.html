@@ -133,138 +133,225 @@
             <!-- Painel Lateral Esquerdo (Controles e Info) -->
             <aside class="viewer-sidebar glass-panel scrollbar-styled">
                 
-                <!-- Sessão: Camadas e Modos -->
-                <div class="sidebar-section">
-                    <div class="section-title">
-                        <i data-lucide="layers"></i>
-                        <h3>Camada de Ortofoto</h3>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label for="opacity-slider">Opacidade</label>
-                        <div class="slider-wrapper">
-                            <input type="range" id="opacity-slider" min="0" max="100" value="100">
-                            <span id="opacity-value">100%</span>
-                        </div>
-                    </div>
-                    
-                    <div id="basemap-control" class="control-group">
-                        <label>Mapa de Fundo</label>
-                        <div class="basemap-grid">
-                            <button class="basemap-card active" data-basemap="satellite">
-                                <span class="basemap-icon satellite"></span>
-                                <span>Satélite</span>
-                            </button>
-                            <button class="basemap-card" data-basemap="osm">
-                                <span class="basemap-icon osm"></span>
-                                <span>Vetor (OSM)</span>
-                            </button>
-                            <button class="basemap-card" data-basemap="none">
-                                <span class="basemap-icon dark"></span>
-                                <span>Sem Fundo</span>
-                            </button>
-                        </div>
-                    </div>
+                <!-- Tab Headers -->
+                <div class="sidebar-tabs">
+                    <button class="tab-btn active" data-tab="tab-geral">Geral</button>
+                    <button class="tab-btn" data-tab="tab-termal">Termal</button>
                 </div>
                 
-                <!-- Sessão: Ajustes de Imagem -->
-                <div class="sidebar-section">
-                    <div class="section-title">
-                        <i data-lucide="sliders-horizontal"></i>
-                        <h3>Ajustes de Imagem</h3>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label for="brightness-slider">Brilho</label>
-                        <div class="slider-wrapper">
-                            <input type="range" id="brightness-slider" min="50" max="150" value="100">
-                            <span id="brightness-value">100%</span>
+                <!-- Tab Content: Geral -->
+                <div id="tab-geral" class="tab-content active">
+                    <!-- Sessão: Camadas e Modos -->
+                    <div class="sidebar-section">
+                        <div class="section-title">
+                            <i data-lucide="layers"></i>
+                            <h3>Camada de Ortofoto</h3>
                         </div>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label for="contrast-slider">Contraste</label>
-                        <div class="slider-wrapper">
-                            <input type="range" id="contrast-slider" min="50" max="200" value="100">
-                            <span id="contrast-value">100%</span>
-                        </div>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label for="saturation-slider">Saturação</label>
-                        <div class="slider-wrapper">
-                            <input type="range" id="saturation-slider" min="0" max="200" value="100">
-                            <span id="saturation-value">100%</span>
-                        </div>
-                    </div>
-                    
-                    <button id="btn-reset-filters" class="btn btn-sm btn-outline-light w-full">
-                        <i data-lucide="rotate-ccw"></i>
-                        <span>Resetar Ajustes</span>
-                    </button>
-                </div>
-                
-                <!-- Sessão: Ferramentas de Medição -->
-                <div class="sidebar-section">
-                    <div class="section-title">
-                        <i data-lucide="ruler"></i>
-                        <h3>Ferramentas de Medição</h3>
-                    </div>
-                    
-                    <div class="tools-grid">
-                        <button id="tool-measure-dist" class="tool-btn">
-                            <i data-lucide="line-chart"></i>
-                            <span>Distância</span>
-                        </button>
-                        <button id="tool-measure-area" class="tool-btn">
-                            <i data-lucide="hexagon"></i>
-                            <span>Área</span>
-                        </button>
-                    </div>
-                    
-                    <div id="measurement-info" class="measurement-result-box hidden">
-                        <div class="result-header">
-                            <span class="result-label">Resultado da Medição</span>
-                            <button id="btn-clear-measurement" title="Limpar medição">
-                                <i data-lucide="trash-2"></i>
-                            </button>
-                        </div>
-                        <div class="result-values">
-                            <div class="result-row" id="result-distance-row">
-                                <span class="lbl">Comprimento:</span>
-                                <span class="val" id="result-distance">-</span>
+                        
+                        <div class="control-group">
+                            <label for="opacity-slider">Opacidade</label>
+                            <div class="slider-wrapper">
+                                <input type="range" id="opacity-slider" min="0" max="100" value="100">
+                                <span id="opacity-value">100%</span>
                             </div>
-                            <div class="result-row hidden" id="result-area-row">
-                                <span class="lbl">Área total:</span>
-                                <span class="val" id="result-area">-</span>
+                        </div>
+                        
+                        <div id="basemap-control" class="control-group">
+                            <label>Mapa de Fundo</label>
+                            <div class="basemap-grid">
+                                <button class="basemap-card active" data-basemap="satellite">
+                                    <span class="basemap-icon satellite"></span>
+                                    <span>Satélite</span>
+                                </button>
+                                <button class="basemap-card" data-basemap="osm">
+                                    <span class="basemap-icon osm"></span>
+                                    <span>Vetor (OSM)</span>
+                                </button>
+                                <button class="basemap-card" data-basemap="none">
+                                    <span class="basemap-icon dark"></span>
+                                    <span>Sem Fundo</span>
+                                </button>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Sessão: Informações Técnicas -->
-                <div class="sidebar-section">
-                    <div class="section-title">
-                        <i data-lucide="info"></i>
-                        <h3>Especificações Técnicas</h3>
+                    
+                    <!-- Sessão: Ajustes de Imagem -->
+                    <div class="sidebar-section">
+                        <div class="section-title">
+                            <i data-lucide="sliders-horizontal"></i>
+                            <h3>Ajustes de Imagem</h3>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="brightness-slider">Brilho</label>
+                            <div class="slider-wrapper">
+                                <input type="range" id="brightness-slider" min="50" max="150" value="100">
+                                <span id="brightness-value">100%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="contrast-slider">Contraste</label>
+                            <div class="slider-wrapper">
+                                <input type="range" id="contrast-slider" min="50" max="200" value="100">
+                                <span id="contrast-value">100%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="saturation-slider">Saturação</label>
+                            <div class="slider-wrapper">
+                                <input type="range" id="saturation-slider" min="0" max="200" value="100">
+                                <span id="saturation-value">100%</span>
+                            </div>
+                        </div>
+                        
+                        <button id="btn-reset-filters" class="btn btn-sm btn-outline-light w-full">
+                            <i data-lucide="rotate-ccw"></i>
+                            <span>Resetar Ajustes</span>
+                        </button>
                     </div>
                     
-                    <div class="info-list">
-                        <div class="info-item">
-                            <span class="label">Dimensões:</span>
-                            <span class="value" id="meta-resolution">-</span>
+                    <!-- Sessão: Ferramentas de Medição -->
+                    <div class="sidebar-section">
+                        <div class="section-title">
+                            <i data-lucide="ruler"></i>
+                            <h3>Ferramentas de Medição</h3>
                         </div>
-                        <div class="info-item">
-                            <span class="label">Tipo do Arquivo:</span>
-                            <span class="value" id="meta-type">-</span>
+                        
+                        <div class="tools-grid">
+                            <button id="tool-measure-dist" class="tool-btn">
+                                <i data-lucide="line-chart"></i>
+                                <span>Distância</span>
+                            </button>
+                            <button id="tool-measure-area" class="tool-btn">
+                                <i data-lucide="hexagon"></i>
+                                <span>Área</span>
+                            </button>
                         </div>
-                        <div class="info-item">
-                            <span class="label">Georreferenciado:</span>
-                            <span class="value badge-status" id="meta-georef">-</span>
+                        
+                        <div id="measurement-info" class="measurement-result-box hidden">
+                            <div class="result-header">
+                                <span class="result-label">Resultado da Medição</span>
+                                <button id="btn-clear-measurement" title="Limpar medição">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </div>
+                            <div class="result-values">
+                                <div class="result-row" id="result-distance-row">
+                                    <span class="lbl">Comprimento:</span>
+                                    <span class="val" id="result-distance">-</span>
+                                </div>
+                                <div class="result-row hidden" id="result-area-row">
+                                    <span class="lbl">Área total:</span>
+                                    <span class="val" id="result-area">-</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="info-item" id="meta-bounds-container">
-                            <span class="label">Coordenadas Limite:</span>
-                            <span class="value code-block" id="meta-bounds">-</span>
+                    </div>
+                    
+                    <!-- Sessão: Informações Técnicas -->
+                    <div class="sidebar-section">
+                        <div class="section-title">
+                            <i data-lucide="info"></i>
+                            <h3>Especificações Técnicas</h3>
+                        </div>
+                        
+                        <div class="info-list">
+                            <div class="info-item">
+                                <span class="label">Dimensões:</span>
+                                <span class="value" id="meta-resolution">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Tipo do Arquivo:</span>
+                                <span class="value" id="meta-type">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">Georreferenciado:</span>
+                                <span class="value badge-status" id="meta-georef">-</span>
+                            </div>
+                            <div class="info-item" id="meta-bounds-container">
+                                <span class="label">Coordenadas Limite:</span>
+                                <span class="value code-block" id="meta-bounds">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Termal -->
+                <div id="tab-termal" class="tab-content">
+                    <div class="sidebar-section">
+                        <div class="section-title">
+                            <i data-lucide="settings"></i>
+                            <h3>Parâmetros Termais</h3>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="thermal-emissivity">Emissividade (0.1 - 1.0)</label>
+                            <input type="number" id="thermal-emissivity" class="input-dark" min="0.1" max="1.0" step="0.01" value="0.95">
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="thermal-distance">Distância do Alvo (m)</label>
+                            <input type="number" id="thermal-distance" class="input-dark" min="0" step="0.1" value="1.0">
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="thermal-ambient">Temp. Ambiente (°C)</label>
+                            <input type="number" id="thermal-ambient" class="input-dark" step="0.1" value="20.0">
+                        </div>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <div class="section-title">
+                            <i data-lucide="thermometer"></i>
+                            <h3>Medições Termais</h3>
+                        </div>
+                        
+                        <div class="tools-grid">
+                            <button id="tool-thermal-point" class="tool-btn">
+                                <i data-lucide="map-pin"></i>
+                                <span>Ponto</span>
+                            </button>
+                            <button id="tool-thermal-line" class="tool-btn">
+                                <i data-lucide="git-commit"></i>
+                                <span>Linha</span>
+                            </button>
+                            <button id="tool-thermal-area" class="tool-btn">
+                                <i data-lucide="square"></i>
+                                <span>Área</span>
+                            </button>
+                        </div>
+                        
+                        <div id="thermal-measurement-info" class="measurement-result-box hidden">
+                            <div class="result-header">
+                                <span class="result-label">Resultado Termal</span>
+                                <button id="btn-clear-thermal" title="Limpar medição termal">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </div>
+                            <div class="result-values">
+                                <div class="result-row hidden" id="thermal-point-row">
+                                    <span class="lbl">Temperatura:</span>
+                                    <span class="val" id="thermal-temp-point">-</span>
+                                </div>
+                                <div class="result-row hidden" id="thermal-stats-row">
+                                    <div class="thermal-stats-grid">
+                                        <div class="stat-item">
+                                            <span class="stat-lbl">Mín:</span>
+                                            <span class="stat-val" id="thermal-temp-min">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-lbl">Máx:</span>
+                                            <span class="stat-val" id="thermal-temp-max">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-lbl">Média:</span>
+                                            <span class="stat-val" id="thermal-temp-avg">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
